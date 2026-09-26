@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex, nofollow" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%22-1%20-1%2083%2083%22%3E%3Cpath%20fill%3D%22%230078ff%22%20d%3D%22M40.49%2C0C18.13%2C0%2C0%2C18.14%2C0%2C40.49s18.13%2C40.49%2C40.49%2C40.49c9.78%2C0%2C19.56-3.53%2C27.27-10.57v-3.24c-5.46%2C5.46-12.61%2C8.19-19.77%2C8.19-15.44%2C0-27.96-12.52-27.96-27.96s12.52-27.96%2C27.96-27.96%2C27.96%2C12.52%2C27.96%2C27.96v27.96h-6.83v5.61h11.86V40.49C80.99%2C18.14%2C62.85%2C0%2C40.49%2C0%22/%3E%3C/svg%3E" />
+<title>Algotech – denní marže</title>
+<style>
+  :root { --navy:#00073D; --blue:#0079FF; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: Arial, Helvetica, sans-serif; background: var(--navy); color:#fff; }
+  .login { min-height:100%; display:flex; align-items:center; justify-content:center; padding:16px; }
+  form { background:#0A1250; border:1px solid #28307A; border-radius:14px; padding:28px; width:min(360px,100%); }
+  h1 { font-size:20px; margin:0 0 4px; } p { color:#AEB3CF; font-size:13px; margin:0 0 18px; }
+  label { display:block; font-size:13px; margin:12px 0 6px; color:#C8CCE0; }
+  input[type=password] { width:100%; padding:10px 12px; border-radius:8px; border:1px solid #3A4290; font-size:15px; }
+  .row { display:flex; gap:8px; align-items:center; margin:12px 0 0; font-size:13px; color:#C8CCE0; }
+  button { margin-top:18px; width:100%; padding:11px; border:0; border-radius:8px; background:var(--blue); color:#fff; font-size:15px; cursor:pointer; }
+  .err { color:#FF9C92; font-size:13px; min-height:18px; margin-top:10px; }
+  #view { display:none; position:fixed; inset:0; background:#fff; }
+  #view iframe { border:0; width:100%; height:100%; }
+  #bar { position:fixed; right:12px; bottom:12px; z-index:5; display:none; gap:8px; }
+  #bar button { width:auto; margin:0; padding:6px 12px; font-size:12px; background:rgba(0,7,61,.85); }
+</style>
+</head>
+<body>
+<div class="login" id="login">
+  <form id="f">
+    <h1>Denní marže Algotech</h1>
+    <p>Důvěrné. Aktualizuje se každé ráno automaticky.</p>
+    <label for="pw">Heslo</label>
+    <input id="pw" type="password" autocomplete="current-password" required autofocus />
+    <div class="row"><input id="rem" type="checkbox" /><label for="rem" style="margin:0">Zapamatovat v tomto prohlížeči</label></div>
+    <button type="submit">Otevřít</button>
+    <div class="err" id="err"></div>
+  </form>
+</div>
+<div id="view"><iframe id="fr" title="Denní marže"></iframe></div>
+<div id="bar"><button id="reload">Obnovit</button><button id="out">Odhlásit</button></div>
+<script>
+const KEY='algotech-marze:key';
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const toB64=u=>{let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode(...u.subarray(i,i+0x8000));return btoa(s)};
+async function load(){const r=await fetch('dashboard.enc.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)throw new Error('Dashboard zatím není publikovaný.');return r.json()}
+async function derive(pw,d){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt:b64(d.salt),iterations:d.iter},base,{name:'AES-GCM',length:256},true,['decrypt'])}
+async function open(key,d){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(d.iv)},key,b64(d.ct));
+  const s=new Blob([pt]).stream().pipeThrough(new DecompressionStream('gzip'));return new Response(s).text()}
+function show(html){document.getElementById('fr').srcdoc=html;document.getElementById('login').style.display='none';
+  document.getElementById('view').style.display='block';document.getElementById('bar').style.display='flex'}
+async function tryStored(){let raw=null;try{raw=sessionStorage.getItem(KEY)||localStorage.getItem(KEY)}catch(e){}
+  if(!raw)return;try{const d=await load();const key=await crypto.subtle.importKey('raw',b64(raw),'AES-GCM',true,['decrypt']);show(await open(key,d))}
+  catch(e){try{localStorage.removeItem(KEY);sessionStorage.removeItem(KEY)}catch(_){}}}
+document.getElementById('f').onsubmit=async ev=>{ev.preventDefault();const err=document.getElementById('err');err.textContent='Otevírám…';
+  try{const d=await load();const key=await derive(document.getElementById('pw').value,d);const html=await open(key,d);
+    try{const raw=toB64(new Uint8Array(await crypto.subtle.exportKey('raw',key)));(document.getElementById('rem').checked?localStorage:sessionStorage).setItem(KEY,raw)}catch(e){}
+    err.textContent='';show(html)}
+  catch(e){err.textContent=e.message.includes('publikovaný')?e.message:'Špatné heslo.'}};
+document.getElementById('out').onclick=()=>{try{localStorage.removeItem(KEY);sessionStorage.removeItem(KEY)}catch(e){}location.reload()};
+document.getElementById('reload').onclick=()=>location.reload();
+tryStored();
+</script>
+</body>
+</html>
