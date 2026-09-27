@@ -3,7 +3,7 @@ name: Publikace denní marže
 # Ranní agent nahraje šifrovaný dashboard na Google Drive; tady si ho GitHub stáhne a zveřejní.
 on:
   schedule:
-    - cron: "20 5-10 * * *"   # každou hodinu 7:20–12:20 (letní čas), 6:20–11:20 (zimní)
+    - cron: "*/15 4-11 * * *"   # každých 15 min 6:00–13:45 (letní čas), 5:00–12:45 (zimní)
   workflow_dispatch: {}
   push:
     branches: [main]
