@@ -20,6 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - name: Stáhnout nejnovější šifrovaný dashboard z Drive
@@ -37,7 +38,5 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+
+   
